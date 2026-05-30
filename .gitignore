@@ -1,0 +1,19 @@
+# Screenshots & debug snapshots
+*.png
+*.jpg
+*.jpeg
+
+# Exclude essential images
+!portrait-main.png
+!portrait-hero.jpg
+!portrait-contact.jpg
+!work-showcase.jpg
+
+# Debug artifacts
+*.md
+.playwright-mcp/
+playground-home/
+
+# OS files
+.DS_Store
+Thumbs.db
