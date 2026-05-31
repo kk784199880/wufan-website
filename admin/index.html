@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>内容编辑器 — 吴凡个人网站</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a0f; --surface: #111118; --border: rgba(255,255,255,0.06);
+    --text: rgba(255,255,255,0.65); --text-dim: rgba(255,255,255,0.25);
+    --purple: #a78bfa; --purple-dim: rgba(139,92,246,0.15);
+    --danger: #f87171; --success: #4ade80;
+    --radius: 10px;
+  }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg); color: var(--text); min-height: 100vh; display: flex;
+  }
+  /* Sidebar */
+  aside {
+    width: 240px; min-width: 240px; background: var(--surface);
+    border-right: 1px solid var(--border); padding: 20px 0;
+    display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh;
+  }
+  aside h1 { font-size: 0.7rem; letter-spacing: 0.15em; color: var(--purple); padding: 0 20px 16px; font-weight: 700; }
+  aside nav { flex: 1; }
+  aside nav a {
+    display: flex; align-items: center; gap: 10px; padding: 10px 20px;
+    font-size: 0.82rem; color: var(--text-dim); text-decoration: none;
+    border-left: 2px solid transparent; transition: all 0.2s;
+  }
+  aside nav a:hover, aside nav a.active {
+    color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.02);
+    border-left-color: var(--purple);
+  }
+  aside nav a span { font-size: 1.1rem; }
+  aside .footer { padding: 16px 20px; font-size: 0.6rem; color: rgba(255,255,255,0.1); letter-spacing: 0.08em; }
+  /* Main */
+  main { flex: 1; padding: 32px 40px; max-width: 900px; overflow-y: auto; height: 100vh; }
+  main h2 { font-size: 1.4rem; font-weight: 700; color: #fff; margin-bottom: 6px; letter-spacing: -0.02em; }
+  main .subtitle { font-size: 0.7rem; color: var(--text-dim); margin-bottom: 28px; letter-spacing: 0.08em; }
+  /* Sections */
+  .section { display: none; }
+  .section.active { display: block; }
+  /* Form elements */
+  .field { margin-bottom: 18px; }
+  .field label { display: block; font-size: 0.7rem; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 5px; text-transform: uppercase; }
+  .field input, .field textarea, .field select {
+    width: 100%; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); color: #fff; font-size: 0.85rem; font-family: inherit;
+    transition: border-color 0.2s; outline: none;
+  }
+  .field input:focus, .field textarea:focus { border-color: var(--purple); }
+  .field textarea { min-height: 100px; resize: vertical; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  /* Cards for list items */
+  .card-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 16px; position: relative;
+  }
+  .card .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .card .card-header span { font-size: 0.7rem; color: var(--purple); letter-spacing: 0.08em; }
+  .card .field:last-child { margin-bottom: 0; }
+  .card .remove-btn {
+    background: none; border: 1px solid rgba(255,255,255,0.08); color: var(--danger);
+    width: 26px; height: 26px; border-radius: 50%; cursor: pointer; font-size: 0.8rem;
+    display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+  }
+  .card .remove-btn:hover { background: rgba(248,113,113,0.1); border-color: var(--danger); }
+  /* Buttons */
+  .btn {
+    padding: 10px 22px; border-radius: 8px; font-size: 0.8rem; font-weight: 600;
+    letter-spacing: 0.06em; cursor: pointer; border: none; transition: all 0.2s;
+  }
+  .btn-primary { background: var(--purple); color: #000; }
+  .btn-primary:hover { background: #c4b5fd; }
+  .btn-outline {
+    background: transparent; border: 1px solid var(--border); color: var(--text);
+  }
+  .btn-outline:hover { border-color: var(--purple); color: #fff; }
+  .btn-danger { background: transparent; border: 1px solid rgba(248,113,113,0.3); color: var(--danger); }
+  .btn-danger:hover { background: rgba(248,113,113,0.1); }
+  .btn-sm { padding: 6px 14px; font-size: 0.7rem; }
+  .btn-row { display: flex; gap: 10px; margin-top: 24px; align-items: center; }
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 30px; right: 30px; padding: 12px 24px; border-radius: 8px;
+    font-size: 0.82rem; z-index: 999; animation: slideUp 0.3s ease;
+    background: #1a1a1a; border: 1px solid var(--border); color: #fff;
+  }
+  .toast.success { border-color: var(--success); }
+  .toast.error { border-color: var(--danger); }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  /* Status badge */
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.65rem; letter-spacing: 0.06em; }
+  .badge-saved { background: rgba(74,222,128,0.1); color: var(--success); }
+  .badge-unsaved { background: rgba(251,191,36,0.1); color: #fbbf24; }
+  /* Tabs for awards */
+  .tabs { display: flex; gap: 4px; margin-bottom: 18px; flex-wrap: wrap; }
+  .tab {
+    padding: 6px 14px; border-radius: 20px; font-size: 0.7rem; cursor: pointer;
+    border: 1px solid var(--border); background: transparent; color: var(--text-dim);
+    letter-spacing: 0.06em; transition: all 0.2s;
+  }
+  .tab.active { background: var(--purple-dim); border-color: var(--purple); color: var(--purple); }
+  .tab:hover:not(.active) { border-color: rgba(255,255,255,0.2); color: #fff; }
+  /* Array item editor */
+  .array-editor .item-row {
+    display: flex; gap: 8px; align-items: center; margin-bottom: 6px;
+  }
+  .array-editor .item-row input { flex: 1; }
+  /* Works raw editor */
+  .code-editor {
+    width: 100%; min-height: 500px; background: #0a0a0f; border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px; color: #e0e0e0; font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.78rem; line-height: 1.6; resize: vertical; outline: none;
+  }
+  .code-editor:focus { border-color: var(--purple); }
+  /* Infobox */
+  .info-box {
+    padding: 14px 18px; border-radius: var(--radius); margin-bottom: 18px;
+    background: rgba(139,92,246,0.06); border: 1px solid rgba(139,92,246,0.15);
+    font-size: 0.75rem; color: var(--text-dim); line-height: 1.5;
+  }
+  .info-box strong { color: var(--purple); }
+</style>
+</head>
+<body>
+<aside>
+  <h1>内容编辑器</h1>
+  <nav id="nav"></nav>
+  <div class="footer">Wu Fan Playground<br>v1.0</div>
+</aside>
+
+<main>
+  <!-- About -->
+  <div class="section" id="sec-about">
+    <h2>个人信息</h2>
+    <p class="subtitle">About section — 姓名、简介、统计数据</p>
+    <div class="info-box">
+      <strong>注意：</strong>论文数量 (publications) 会从 ORCID 自动获取覆盖，此处为备用值。
+    </div>
+    <form id="form-about">
+      <div class="field-row">
+        <div class="field"><label>Name (EN)</label><input name="name"></div>
+        <div class="field"><label>Name (ZH)</label><input name="nameZh"></div>
+      </div>
+      <div class="field"><label>Bio — Paragraph 1 (EN)</label><textarea name="bio.en.0" rows="3"></textarea></div>
+      <div class="field"><label>Bio — Paragraph 1 (ZH)</label><textarea name="bio.zh.0" rows="3"></textarea></div>
+      <div class="field"><label>Bio — Paragraph 2 (EN)</label><textarea name="bio.en.1" rows="3"></textarea></div>
+      <div class="field"><label>Bio — Paragraph 2 (ZH)</label><textarea name="bio.zh.1" rows="3"></textarea></div>
+      <div class="field-row">
+        <div class="field"><label>Stats — Publications</label><input name="stats.publications" type="number"></div>
+        <div class="field"><label>Stats — Awards</label><input name="stats.awards" type="number"></div>
+        <div class="field"><label>Stats — Patents</label><input name="stats.patents" type="number"></div>
+      </div>
+      <div class="btn-row">
+        <button type="submit" class="btn btn-primary">保存</button>
+        <span class="badge badge-saved" id="status-about"></span>
+      </div>
+    </form>
+  </div>
+
+  <!-- Awards -->
+  <div class="section" id="sec-awards">
+    <h2>获奖记录</h2>
+    <p class="subtitle">Awards — Logo映射 + 按年份的获奖列表</p>
+    <form id="form-awards">
+      <h3 style="font-size:0.85rem;color:var(--purple);margin-bottom:10px;letter-spacing:0.06em">Logo 映射</h3>
+      <p style="font-size:0.65rem;color:var(--text-dim);margin-bottom:12px">key 为奖项名称前缀，匹配到即显示对应 logo。invert 用于深色 logo 在暗色背景上反色。</p>
+      <div class="card-list" id="logo-cards"></div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="addLogoEntry()">+ 添加 Logo 映射</button>
+
+      <h3 style="font-size:0.85rem;color:var(--purple);margin:28px 0 10px;letter-spacing:0.06em">获奖列表</h3>
+      <div class="tabs" id="award-year-tabs"></div>
+      <div class="card-list" id="award-cards"></div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="addAwardItem()">+ 添加获奖条目</button>
+      <button type="button" class="btn btn-outline btn-sm" style="margin-left:8px" onclick="addAwardYear()">+ 添加年份组</button>
+
+      <div class="btn-row">
+        <button type="submit" class="btn btn-primary">保存</button>
+        <span class="badge badge-saved" id="status-awards"></span>
+      </div>
+    </form>
+  </div>
+
+  <!-- Timeline -->
+  <div class="section" id="sec-timeline">
+    <h2>生涯历程</h2>
+    <p class="subtitle">Timeline — 教育/职业时间线</p>
+    <form id="form-timeline">
+      <div class="card-list" id="timeline-cards"></div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="addTimelineEntry()">+ 添加条目</button>
+      <div class="btn-row">
+        <button type="submit" class="btn btn-primary">保存</button>
+        <span class="badge badge-saved" id="status-timeline"></span>
+      </div>
+    </form>
+  </div>
+
+  <!-- Skills -->
+  <div class="section" id="sec-skills">
+    <h2>技能工具</h2>
+    <p class="subtitle">Skills — 技能标签列表</p>
+    <form id="form-skills">
+      <div class="array-editor" id="skills-editor"></div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="addSkill()" style="margin-top:10px">+ 添加技能</button>
+      <div class="btn-row">
+        <button type="submit" class="btn btn-primary">保存</button>
+        <span class="badge badge-saved" id="status-skills"></span>
+      </div>
+    </form>
+  </div>
+
+  <!-- Contact -->
+  <div class="section" id="sec-contact">
+    <h2>联系方式</h2>
+    <p class="subtitle">Contact — 联系信息列表</p>
+    <form id="form-contact">
+      <div class="card-list" id="contact-cards"></div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="addContactItem()">+ 添加联系方式</button>
+      <div class="btn-row">
+        <button type="submit" class="btn btn-primary">保存</button>
+        <span class="badge badge-saved" id="status-contact"></span>
+      </div>
+    </form>
+  </div>
+
+  <!-- Passions -->
+  <div class="section" id="sec-passions">
+    <h2>设计之外</h2>
+    <p class="subtitle">Passions — 兴趣爱好卡片</p>
+    <form id="form-passions">
+      <div class="card-list" id="passions-cards"></div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="addPassionItem()">+ 添加兴趣</button>
+      <div class="btn-row">
+        <button type="submit" class="btn btn-primary">保存</button>
+        <span class="badge badge-saved" id="status-passions"></span>
+      </div>
+    </form>
+  </div>
+
+  <!-- Enrichment -->
+  <div class="section" id="sec-enrichment">
+    <h2>论文标签</h2>
+    <p class="subtitle">Enrichment — DOI → 期刊等级/作者角色</p>
+    <div class="btn-row" style="margin-bottom:20px">
+      <button type="button" class="btn btn-primary" id="btn-orcid-sync" onclick="syncOrcid()">🔄 从 ORCID 同步最新论文</button>
+      <span id="orcid-status" style="font-size:0.7rem;color:var(--text-dim)"></span>
+    </div>
+    <div class="info-box" id="orcid-new-box" style="display:none">
+      <strong>新论文：</strong>以下论文在 ORCID 上存在但尚未添加标签。点击「添加标签」填充表单。
+    </div>
+    <div class="card-list" id="orcid-new-cards"></div>
+
+    <h3 style="font-size:0.85rem;color:var(--purple);margin:24px 0 10px;letter-spacing:0.06em">已添加的标签</h3>
+    <form id="form-enrichment">
+      <div class="card-list" id="enrichment-cards"></div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="addEnrichmentEntry()">+ 手动添加 DOI 标签</button>
+      <div class="btn-row">
+        <button type="submit" class="btn btn-primary">保存</button>
+        <span class="badge badge-saved" id="status-enrichment"></span>
+      </div>
+    </form>
+  </div>
+
+  <!-- Works -->
+  <div class="section" id="sec-works">
+    <h2>设计作品</h2>
+    <p class="subtitle">Works — 作品数据 (works.ts)</p>
+    <div class="info-box">
+      <strong>提示：</strong>运行 <code>npm run sync</code> 可从普象自动同步作品。<br>
+      此处可直接编辑 TypeScript 源文件进行微调（如 award、description 字段）。
+    </div>
+    <form id="form-works">
+      <div class="field"><label>works.ts 源码</label><textarea name="content" class="code-editor" rows="20"></textarea></div>
+      <div class="btn-row">
+        <button type="submit" class="btn btn-primary">保存</button>
+        <span class="badge badge-saved" id="status-works"></span>
+      </div>
+    </form>
+  </div>
+</main>
+
+<script>
+// ── Navigation & Section switching ──
+const sections = [
+  'about','awards','timeline','skills','contact','passions','enrichment','works'
+];
+const labels = {
+  about:'👤 个人信息', awards:'🏆 获奖记录', timeline:'📅 生涯历程',
+  skills:'🛠️ 技能工具', contact:'📬 联系方式', passions:'💪 设计之外',
+  enrichment:'📝 论文标签', works:'🎨 设计作品'
+};
+
+const nav = document.getElementById('nav');
+const current = localStorage.getItem('admin-section') || 'about';
+sections.forEach(s => {
+  const a = document.createElement('a');
+  a.href = '#';
+  a.dataset.section = s;
+  a.innerHTML = labels[s];
+  if (s === current) a.classList.add('active');
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    showSection(s);
+    localStorage.setItem('admin-section', s);
+  });
+  nav.appendChild(a);
+});
+
+function showSection(key) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+  const sec = document.getElementById('sec-' + key);
+  if (sec) sec.classList.add('active');
+  const link = document.querySelector(`nav a[data-section="${key}"]`);
+  if (link) link.classList.add('active');
+  loadSection(key);
+}
+
+// ── Toast ──
+function toast(msg, type = '') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2500);
+}
+
+// ── API helpers ──
+async function apiGet(key) {
+  const r = await fetch('/api/data/' + key);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+async function apiPut(key, data) {
+  const r = await fetch('/api/data/' + key, {
+    method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+// ── Section loaders ──
+async function loadSection(key) {
+  try {
+    if (key === 'about') await loadAbout();
+    else if (key === 'awards') await loadAwards();
+    else if (key === 'timeline') await loadTimeline();
+    else if (key === 'skills') await loadSkills();
+    else if (key === 'contact') await loadContact();
+    else if (key === 'passions') await loadPassions();
+    else if (key === 'enrichment') await loadEnrichment();
+    else if (key === 'works') await loadWorks();
+  } catch (e) {
+    toast('加载失败: ' + e.message, 'error');
+  }
+}
+
+// ── About ──
+async function loadAbout() {
+  const { data } = await apiGet('about');
+  setVal('name', data.name);
+  setVal('nameZh', data.nameZh);
+  setVal('bio.en.0', data.bio.en[0] || '');
+  setVal('bio.zh.0', data.bio.zh[0] || '');
+  setVal('bio.en.1', data.bio.en[1] || '');
+  setVal('bio.zh.1', data.bio.zh[1] || '');
+  setVal('stats.publications', data.stats.publications);
+  setVal('stats.awards', data.stats.awards);
+  setVal('stats.patents', data.stats.patents);
+}
+document.getElementById('form-about').addEventListener('submit', async e => {
+  e.preventDefault();
+  const data = {
+    name: getVal('name'), nameZh: getVal('nameZh'),
+    bio: { en: [getVal('bio.en.0'), getVal('bio.en.1'), ''], zh: [getVal('bio.zh.0'), getVal('bio.zh.1')] },
+    stats: { publications: +getVal('stats.publications'), awards: +getVal('stats.awards'), patents: +getVal('stats.patents') }
+  };
+  // keep 3rd paragraph if exists
+  try {
+    const old = await apiGet('about');
+    data.bio.en[2] = old.data.bio.en[2] || '';
+  } catch {}
+  await apiPut('about', data);
+  setStatus('about', '已保存');
+  toast('个人信息已保存', 'success');
+});
+
+// ── Awards ──
+let logoMapData = {};
+let awardsByYearData = [];
+let awardActiveYear = '';
+async function loadAwards() {
+  const { data } = await apiGet('awards');
+  logoMapData = data.logoMap || {};
+  awardsByYearData = data.awardsByYear || [];
+  if (awardsByYearData.length && !awardsByYearData.find(y => y.year === awardActiveYear)) {
+    awardActiveYear = awardsByYearData[0].year;
+  }
+  renderLogoMap();
+  renderAwardYearTabs();
+  renderAwardItems();
+}
+function renderLogoMap() {
+  document.getElementById('logo-cards').innerHTML = Object.entries(logoMapData).map(([key, val]) => `
+    <div class="card">
+      <div class="card-header">
+        <span>前缀: ${esc(key)}</span>
+        <button class="remove-btn" onclick="removeLogo('${esc(key)}')">✕</button>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>匹配前缀</label><input value="${esc(key)}" data-logo-key="${esc(key)}" data-field="key"></div>
+        <div class="field"><label>Logo 路径</label><input value="${esc(val.src)}" data-logo-key="${esc(key)}" data-field="src" placeholder="/assets/awards/xxx.png"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>反色 (深色logo需反色)</label>
+          <select data-logo-key="${esc(key)}" data-field="invert" style="width:100%;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);color:#fff;font-size:0.85rem">
+            <option value="false" ${!val.invert ? 'selected' : ''}>否 — 原色显示</option>
+            <option value="true" ${val.invert ? 'selected' : ''}>是 — 反色 (白色)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+function removeLogo(key) { delete logoMapData[key]; renderLogoMap(); }
+function addLogoEntry() { logoMapData['NEW-PREFIX'] = { src:'/assets/awards/', invert:false }; renderLogoMap(); }
+function renderAwardYearTabs() {
+  document.getElementById('award-year-tabs').innerHTML = awardsByYearData.map(y => `
+    <button type="button" class="tab ${y.year === awardActiveYear ? 'active' : ''}" onclick="selectAwardYear('${esc(y.year)}')">${esc(y.year)}</button>
+  `).join('');
+}
+function selectAwardYear(year) { awardActiveYear = year; renderAwardYearTabs(); renderAwardItems(); }
+function renderAwardItems() {
+  const group = awardsByYearData.find(y => y.year === awardActiveYear);
+  const items = group ? group.items : [];
+  document.getElementById('award-cards').innerHTML = items.map((item, i) => `
+    <div class="card">
+      <div class="card-header">
+        <span>#${i + 1}</span>
+        <button class="remove-btn" onclick="removeAwardItem('${esc(awardActiveYear)}', ${i})">✕</button>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Award Name</label><input value="${esc(item.name)}" data-year="${esc(awardActiveYear)}" data-idx="${i}" data-field="name" placeholder="e.g. SPARK Silver"></div>
+        <div class="field"><label>Work</label><input value="${esc(item.work)}" data-year="${esc(awardActiveYear)}" data-idx="${i}" data-field="work" placeholder="e.g. One-Hand Measuring Ruler"></div>
+      </div>
+    </div>
+  `).join('');
+}
+function removeAwardItem(year, idx) {
+  const group = awardsByYearData.find(y => y.year === year);
+  if (group) { group.items.splice(idx, 1); if (group.items.length === 0) { awardsByYearData = awardsByYearData.filter(y => y.year !== year); awardActiveYear = awardsByYearData[0]?.year || ''; } }
+  renderAwardYearTabs(); renderAwardItems();
+}
+function addAwardItem() {
+  if (!awardActiveYear) { toast('请先添加年份组', 'error'); return; }
+  const group = awardsByYearData.find(y => y.year === awardActiveYear);
+  if (group) group.items.push({ name:'', work:'' });
+  renderAwardItems();
+}
+function addAwardYear() {
+  const year = prompt('输入年份 (e.g. 2026):');
+  if (!year) return;
+  if (awardsByYearData.find(y => y.year === year)) { toast('该年份已存在', 'error'); return; }
+  awardsByYearData.push({ year, items:[] });
+  awardsByYearData.sort((a,b) => b.year.localeCompare(a.year));
+  awardActiveYear = year;
+  renderAwardYearTabs(); renderAwardItems();
+}
+document.getElementById('form-awards').addEventListener('submit', async e => {
+  e.preventDefault();
+  // Collect logo map
+  const newLogoMap = {};
+  document.querySelectorAll('#logo-cards input, #logo-cards select').forEach(el => {
+    const key = el.dataset.logoKey;
+    if (!key) return;
+    if (!newLogoMap[key]) newLogoMap[key] = { src:'', invert:false };
+    if (el.dataset.field === 'key') { const v = el.value.trim(); if (v !== key) { newLogoMap[v] = newLogoMap[key]; delete newLogoMap[key]; el.dataset.logoKey = v; } }
+    else if (el.dataset.field === 'src') newLogoMap[el.dataset.logoKey].src = el.value.trim();
+    else if (el.dataset.field === 'invert') newLogoMap[el.dataset.logoKey].invert = el.value === 'true';
+  });
+  // Collect award items
+  document.querySelectorAll('#award-cards input').forEach(el => {
+    const year = el.dataset.year;
+    const idx = +el.dataset.idx;
+    const group = awardsByYearData.find(y => y.year === year);
+    if (group && group.items[idx]) group.items[idx][el.dataset.field] = el.value;
+  });
+  // Clean empty logo keys
+  Object.keys(newLogoMap).forEach(k => { if (k === 'NEW-PREFIX' || !k || !newLogoMap[k].src) delete newLogoMap[k]; });
+  await apiPut('awards', { logoMap: newLogoMap, awardsByYear: awardsByYearData.filter(g => g.items.length > 0) });
+  logoMapData = newLogoMap;
+  setStatus('awards', '已保存');
+  toast('获奖记录已保存', 'success');
+});
+
+// ── Timeline ──
+let timelineData = [];
+async function loadTimeline() {
+  const { data } = await apiGet('timeline');
+  timelineData = data.entries;
+  renderTimeline();
+}
+function renderTimeline() {
+  const container = document.getElementById('timeline-cards');
+  container.innerHTML = timelineData.map((t, i) => `
+    <div class="card">
+      <div class="card-header">
+        <span>#${i + 1}</span>
+        <button class="remove-btn" onclick="removeTimeline(${i})">✕</button>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Year</label><input value="${esc(t.year)}" data-idx="${i}" data-field="year"></div>
+        <div class="field"><label>Title</label><input value="${esc(t.title)}" data-idx="${i}" data-field="title"></div>
+      </div>
+      <div class="field"><label>Description</label><input value="${esc(t.desc)}" data-idx="${i}" data-field="desc"></div>
+      <div class="field"><label>Location</label><input value="${esc(t.location)}" data-idx="${i}" data-field="location"></div>
+    </div>
+  `).join('');
+}
+function removeTimeline(i) { timelineData.splice(i, 1); renderTimeline(); }
+function addTimelineEntry() { timelineData.push({ year:'', title:'', desc:'', location:'' }); renderTimeline(); }
+document.getElementById('form-timeline').addEventListener('submit', async e => {
+  e.preventDefault();
+  document.querySelectorAll('#timeline-cards input').forEach(inp => {
+    const i = +inp.dataset.idx;
+    const field = inp.dataset.field;
+    timelineData[i][field] = inp.value;
+  });
+  await apiPut('timeline', { entries: timelineData });
+  setStatus('timeline', '已保存');
+  toast('生涯历程已保存', 'success');
+});
+
+// ── Skills ──
+let skillsData = [];
+async function loadSkills() {
+  const { data } = await apiGet('skills');
+  skillsData = data.items;
+  renderSkills();
+}
+function renderSkills() {
+  document.getElementById('skills-editor').innerHTML = skillsData.map((s, i) => `
+    <div class="item-row">
+      <input value="${esc(s)}" data-idx="${i}" data-field="skill" placeholder="技能名称">
+      <button type="button" class="remove-btn" onclick="removeSkill(${i})">✕</button>
+    </div>
+  `).join('');
+}
+function removeSkill(i) { skillsData.splice(i, 1); renderSkills(); }
+function addSkill() { skillsData.push(''); renderSkills(); }
+document.getElementById('form-skills').addEventListener('submit', async e => {
+  e.preventDefault();
+  document.querySelectorAll('#skills-editor input').forEach(inp => {
+    skillsData[+inp.dataset.idx] = inp.value;
+  });
+  await apiPut('skills', { items: skillsData.filter(Boolean) });
+  setStatus('skills', '已保存');
+  toast('技能列表已保存', 'success');
+});
+
+// ── Contact ──
+let contactData = [];
+async function loadContact() {
+  const { data } = await apiGet('contact');
+  contactData = data.items;
+  renderContact();
+}
+function renderContact() {
+  document.getElementById('contact-cards').innerHTML = contactData.map((c, i) => `
+    <div class="card">
+      <div class="card-header">
+        <span>#${i + 1}</span>
+        <button class="remove-btn" onclick="removeContact(${i})">✕</button>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Label</label><input value="${esc(c.label)}" data-idx="${i}" data-field="label"></div>
+        <div class="field"><label>Value</label><input value="${esc(c.value)}" data-idx="${i}" data-field="value"></div>
+      </div>
+      <div class="field"><label>Href (可选)</label><input value="${esc(c.href||'')}" data-idx="${i}" data-field="href"></div>
+    </div>
+  `).join('');
+}
+function removeContact(i) { contactData.splice(i, 1); renderContact(); }
+function addContactItem() { contactData.push({ label:'', value:'', href:'' }); renderContact(); }
+document.getElementById('form-contact').addEventListener('submit', async e => {
+  e.preventDefault();
+  document.querySelectorAll('#contact-cards input').forEach(inp => {
+    const i = +inp.dataset.idx;
+    const field = inp.dataset.field;
+    contactData[i][field] = inp.value;
+  });
+  await apiPut('contact', { items: contactData });
+  setStatus('contact', '已保存');
+  toast('联系方式已保存', 'success');
+});
+
+// ── Passions ──
+let passionsData = [];
+async function loadPassions() {
+  const { data } = await apiGet('passions');
+  passionsData = data.items;
+  renderPassions();
+}
+function renderPassions() {
+  document.getElementById('passions-cards').innerHTML = passionsData.map((h, i) => `
+    <div class="card">
+      <div class="card-header">
+        <span>#${i + 1}</span>
+        <button class="remove-btn" onclick="removePassion(${i})">✕</button>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Icon (emoji)</label><input value="${esc(h.icon)}" data-idx="${i}" data-field="icon"></div>
+        <div class="field"><label>Name (EN)</label><input value="${esc(h.name)}" data-idx="${i}" data-field="name"></div>
+      </div>
+      <div class="field"><label>Description (EN)</label><input value="${esc(h.desc)}" data-idx="${i}" data-field="desc"></div>
+      <div class="field"><label>Description (ZH)</label><input value="${esc(h.zh)}" data-idx="${i}" data-field="zh"></div>
+    </div>
+  `).join('');
+}
+function removePassion(i) { passionsData.splice(i, 1); renderPassions(); }
+function addPassionItem() { passionsData.push({ icon:'', name:'', desc:'', zh:'' }); renderPassions(); }
+document.getElementById('form-passions').addEventListener('submit', async e => {
+  e.preventDefault();
+  document.querySelectorAll('#passions-cards input').forEach(inp => {
+    const i = +inp.dataset.idx;
+    const field = inp.dataset.field;
+    passionsData[i][field] = inp.value;
+  });
+  await apiPut('passions', { items: passionsData });
+  setStatus('passions', '已保存');
+  toast('兴趣爱好已保存', 'success');
+});
+
+// ── Enrichment ──
+let enrichData = {};
+let orcidPubs = [];
+async function loadEnrichment() {
+  const { data } = await apiGet('enrichment');
+  enrichData = data;
+  renderEnrichment();
+}
+function renderEnrichment() {
+  const entries = Object.entries(enrichData);
+  document.getElementById('enrichment-cards').innerHTML = entries.map(([doi, val], i) => `
+    <div class="card">
+      <div class="card-header">
+        <span>${esc(val.tag) || '未命名'} — ${esc(doi.substring(0,35))}...</span>
+        <button class="remove-btn" onclick="removeEnrichment('${esc(doi)}')">✕</button>
+      </div>
+      <input type="hidden" value="${esc(doi)}" data-idx="${i}" data-field="doi_orig">
+      <div class="field-row">
+        <div class="field"><label>DOI</label><input value="${esc(doi)}" data-idx="${i}" data-field="doi"></div>
+        <div class="field"><label>期刊等级标签</label><input value="${esc(val.tag)}" data-idx="${i}" data-field="tag" placeholder="e.g. SCI · JCR Q1"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>标签颜色</label><input value="${esc(val.tagColor)}" data-idx="${i}" data-field="tagColor" placeholder="#a78bfa"></div>
+        <div class="field"><label>作者角色</label><input value="${esc(val.author)}" data-idx="${i}" data-field="author" placeholder="First Author"></div>
+      </div>
+    </div>
+  `).join('');
+}
+function removeEnrichment(doi) { delete enrichData[doi]; renderEnrichment(); }
+function addEnrichmentEntry() { enrichData[''] = { tag:'', tagColor:'#a78bfa', author:'' }; renderEnrichment(); }
+function addEnrichForDoi(doi, title) {
+  if (enrichData[doi]) { toast('该 DOI 已存在标签', 'error'); return; }
+  enrichData[doi] = { tag:'', tagColor:'#a78bfa', author:'' };
+  renderEnrichment();
+  document.getElementById('orcid-new-box').style.display = 'none';
+  document.getElementById('orcid-new-cards').innerHTML = '';
+  toast('已添加: ' + title.substring(0,50), 'success');
+}
+document.getElementById('form-enrichment').addEventListener('submit', async e => {
+  e.preventDefault();
+  const newData = {};
+  document.querySelectorAll('#enrichment-cards .card').forEach(card => {
+    const inputs = card.querySelectorAll('input');
+    const doi = inputs[1].value.trim();
+    const tag = inputs[2].value.trim();
+    const tagColor = inputs[3].value.trim();
+    const author = inputs[4].value.trim();
+    if (doi) newData[doi] = { tag, tagColor, author };
+  });
+  await apiPut('enrichment', newData);
+  enrichData = newData;
+  setStatus('enrichment', '已保存');
+  toast('论文标签已保存', 'success');
+});
+
+// ── ORCID Sync ──
+async function syncOrcid() {
+  const btn = document.getElementById('btn-orcid-sync');
+  const status = document.getElementById('orcid-status');
+  btn.disabled = true; btn.textContent = '⏳ 正在从 ORCID 获取...';
+  status.textContent = '';
+  try {
+    const resp = await fetch('/api/orcid-fetch');
+    const data = await resp.json();
+    orcidPubs = data.publications || [];
+    const journalPubs = orcidPubs.filter(p => p.type === 'journal-article');
+    const newPubs = journalPubs.filter(p => p.doi && !enrichData[p.doi]);
+    status.textContent = `共 ${journalPubs.length} 篇期刊论文，${newPubs.length} 篇未标注`;
+    if (newPubs.length > 0) {
+      document.getElementById('orcid-new-box').style.display = 'block';
+      document.getElementById('orcid-new-cards').innerHTML = newPubs.map(p => `
+        <div class="card" style="border-color:rgba(139,92,246,0.25);background:rgba(139,92,246,0.03)">
+          <div class="card-header">
+            <span style="color:var(--purple)">新论文 · ${esc(p.year)}</span>
+          </div>
+          <p style="font-size:0.82rem;color:#fff;margin-bottom:6px;line-height:1.4">${esc(p.title)}</p>
+          <p style="font-size:0.7rem;color:var(--text-dim);margin-bottom:10px">${esc(p.journal)} · DOI: ${esc(p.doi.substring(0,30))}...</p>
+          <button type="button" class="btn btn-primary btn-sm" onclick="addEnrichForDoi('${esc(p.doi)}', '${esc(p.title.replace(/'/g, "\\'"))}')">+ 添加标签</button>
+        </div>
+      `).join('');
+    } else {
+      document.getElementById('orcid-new-box').style.display = 'none';
+      document.getElementById('orcid-new-cards').innerHTML = '';
+      toast('所有论文都已标注 ✓', 'success');
+    }
+  } catch (e) {
+    status.textContent = '获取失败';
+    toast('ORCID 同步失败: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '🔄 从 ORCID 同步最新论文';
+  }
+}
+
+// ── Works (raw TS editor) ──
+async function loadWorks() {
+  const { data } = await apiGet('works');
+  setVal('content', data.content);
+}
+document.getElementById('form-works').addEventListener('submit', async e => {
+  e.preventDefault();
+  await apiPut('works', { content: getVal('content') });
+  setStatus('works', '已保存');
+  toast('作品数据已保存', 'success');
+});
+
+// ── Helpers ──
+function getVal(name) {
+  const el = document.querySelector(`[name="${name}"]`);
+  return el ? el.value : '';
+}
+function setVal(name, value) {
+  const el = document.querySelector(`[name="${name}"]`);
+  if (el) el.value = value ?? '';
+}
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function setStatus(key, msg) {
+  const el = document.getElementById('status-' + key);
+  if (el) { el.textContent = msg; setTimeout(() => el.textContent = '', 3000); }
+}
+
+// ── Init ──
+showSection(current);
+</script>
+</body>
+</html>
